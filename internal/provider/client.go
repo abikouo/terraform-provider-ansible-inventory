@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
+	"crypto/tls"
+	"encoding/json"
 )
 
 // Client -
-type Client struct {
+type ControllerClient struct {
 	HostURL    				string
 	Username   				*string
 	Password   				*string
@@ -22,10 +23,15 @@ type AnsibleHost struct {
 	Variables   map[string]string           `json:"variables"`
 }
 
+// ansible host list
+type AnsibleHostList struct {
+	Hosts		[]AnsibleHost				`json:"hosts"`
+}
+
 // NewClient -
-func NewClient(host string, username *string, password *string, insecure_skip_verify bool) (*Client, error) {
-	client := Client{
-		HostURL: HostURL,
+func NewClient(host string, username *string, password *string, insecure_skip_verify bool) (*ControllerClient, error) {
+	client := ControllerClient{
+		HostURL: host,
 		Username: username,
 		Password: password,
 		InsecureSkipVerify: insecure_skip_verify, 
@@ -35,13 +41,9 @@ func NewClient(host string, username *string, password *string, insecure_skip_ve
 }
 
 
-func (c *Client) GetHosts(stateEndPoint *string) (*AnsibleHost, error) {
+func (c *ControllerClient) GetHosts(stateEndPoint string) (*AnsibleHostList, error) {
 	
-	if stateEndPoint == nil {
-		return nil, fmt.Errorf("missing mandatory state endpoint")
-	}
-
-	req, err := http.NewRequest("GET", c.HostURL + *stateEndPoint, nil)
+	req, err := http.NewRequest("GET", c.HostURL + stateEndPoint, nil)
 	if c.Username != nil && c.Password != nil {
     	req.SetBasicAuth(*c.Username, *c.Password)
 	}
@@ -67,22 +69,22 @@ func (c *Client) GetHosts(stateEndPoint *string) (*AnsibleHost, error) {
 	}
 
     if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status: %d, body: %s", res.StatusCode, body)
+		return nil, fmt.Errorf("status: %d, body: %s", resp.StatusCode, body)
 	}
 
     return GetAnsibleHost(body)
 }
 
 
-func GetAnsibleHost(body []byte)(*AnsibleHost, error){
+func GetAnsibleHost(body []byte)(*AnsibleHostList, error){
 
 	var result map[string]interface{}
-    err = json.Unmarshal(body, &result)
+    err := json.Unmarshal(body, &result)
     if err != nil {
 		return nil, err
 	}
 
-    var hosts []AnsibleHost
+    var hosts AnsibleHostList
     resources, ok := result["resources"].([]interface{})
     if ok {
         for _, resource := range resources{
@@ -103,7 +105,7 @@ func GetAnsibleHost(body []byte)(*AnsibleHost, error){
                             for key, value := range attributes["variables"].(map[string]interface{}){
                                 variables[key] = value.(string)
                             }
-                            hosts = append(hosts, AnsibleHost{
+                            hosts.Hosts = append(hosts.Hosts, AnsibleHost{
                                 Name: name,
                                 Groups: groups,
                                 Variables: variables,

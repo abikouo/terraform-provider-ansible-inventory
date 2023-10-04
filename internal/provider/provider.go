@@ -55,9 +55,8 @@ func (p *ansibleInventoryProvider) Schema(_ context.Context, _ provider.SchemaRe
                 Optional:  true,
                 Sensitive: true,
             },
-            "insecure_skip_verify": schema.StringAttribute{
+            "insecure_skip_verify": schema.BoolAttribute{
                 Optional:   true,
-                Default:    false,
             },
         },
     }
@@ -122,9 +121,10 @@ func (p *ansibleInventoryProvider) Configure(ctx context.Context, req provider.C
     username := os.Getenv("CONTROLLER_USERNAME")
     password := os.Getenv("CONTROLLER_PASSWORD")
     var insecure_skip_verify bool = false
+    var err error
     raw_insecure_skip_verify := os.Getenv("CONTROLLER_INSECURE_SKIP_VERIFY")
     if raw_insecure_skip_verify != "" {
-        insecure_skip_verify, err := strconv.ParseBool(raw_insecure_skip_verify)
+        insecure_skip_verify, err = strconv.ParseBool(raw_insecure_skip_verify)
         if err != nil {
             resp.Diagnostics.AddAttributeError(
                 path.Root("insecure_skip_verify"),
@@ -148,7 +148,7 @@ func (p *ansibleInventoryProvider) Configure(ctx context.Context, req provider.C
     }
 
     if !config.InsecureSkipVerify.IsNull() {
-        insecure_skip_verify = config.InsecureSkipVerify.Value()
+        insecure_skip_verify = config.InsecureSkipVerify.ValueBool()
     }
 
     // If any of the expected configurations are missing, return
